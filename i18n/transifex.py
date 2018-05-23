@@ -46,8 +46,7 @@ def push_all():
 
 def pull(configuration, *resources):
     """
-    Pull translations from all languages listed in conf/locale/config.yaml
-    where there is at least 10% reviewed translations.
+    Pull reviewed translations from all languages listed in conf/locale/config.yaml.
 
     If arguments are provided, they are specific resources to pull.  Otherwise,
     all resources are pulled.
@@ -118,7 +117,10 @@ def clean_locale(configuration, locale):
     Iterates over machine-generated files.
     """
     dirname = configuration.get_messages_dir(locale)
-    for filename in ('django-partial.po', 'djangojs-partial.po', 'mako.po'):
+    if not dirname.exists():
+        # Happens when we have a supported locale that doesn't exist in Transifex
+        return
+    for filename in dirname.files('*.po'):
         clean_file(configuration, dirname.joinpath(filename))
 
 
@@ -127,21 +129,18 @@ def clean_file(configuration, filename):
     Strips out the warning from a translated po file about being an English source file.
     Replaces warning with a note about coming from Transifex.
     """
-    try:
-        pofile = polib.pofile(filename)
-    except Exception as exc:  # pylint: disable=broad-except
-        # An exception can occur when a language is deleted from Transifex.
-        # Don't totally fail here.
-        print(
-            "Encountered error {} with filename {} - language project may "
-            "no longer exist on Transifex".format(exc, filename)
-        )
-        return
+    pofile = polib.pofile(filename)
+
+    # For 0% translated files, this metadata key will be missing, but our validate code requires it.
+    # Just make sure it is defined at all.
+    pofile.metadata.setdefault('Last-Translator', '')
+
     if pofile.header.find(EDX_MARKER) != -1:
         new_header = get_new_header(configuration, pofile)
         new = pofile.header.replace(EDX_MARKER, new_header)
         pofile.header = new
-        pofile.save()
+
+    pofile.save()
 
 
 def get_new_header(configuration, pofile):

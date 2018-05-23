@@ -102,10 +102,6 @@ class TestTransifex(I18nToolTestCase):
     def test_clean_locale(self):
         with mock.patch('i18n.transifex.clean_file') as patched:
             transifex.clean_locale(self.configuration, 'fr')
-            self.assertEqual(3, patched.call_count)
-            call_args = ['django-partial.po', 'djangojs-partial.po', 'mako.po']
-            for callarg, expected in zip(patched.call_args_list, call_args):
-                self.assertEqual(
-                    callarg[0][1].name,
-                    expected
-                )
+            self.assertEqual(12, patched.call_count)
+            for callarg in patched.call_args_list:
+                self.assertRegexpMatches(callarg[0][1].name, '.*\.po')
